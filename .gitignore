@@ -1,0 +1,11 @@
+/.electron-cache/
+/.electron-user-data/
+/.tmp-chromium/
+/node_modules/
+/dist
+/dist-node
+/plans
+/out
+/.idea
+backup.tasks.json
+backup.tasks.js
