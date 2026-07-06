@@ -216,9 +216,9 @@ function App() {
         key={task.backupName}
         p="3"
         borderWidth="1px"
-        borderColor="gray.700"
+        borderColor="border.emphasized"
         rounded="sm"
-        bg="gray.900"
+        bg="bg.subtle"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
       >
@@ -241,7 +241,7 @@ function App() {
             </Checkbox.Root>
             <Stack gap="1">
               <Text fontWeight="semibold">{task.backupName}</Text>
-              <Text color="gray.400" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 {task.description || "No description"}
               </Text>
               <HStack gap="2">
@@ -268,11 +268,11 @@ function App() {
                 <Progress.Range />
               </Progress.Track>
             </Progress.Root>
-            <Text fontSize="xs" color="gray.400">
+            <Text fontSize="xs" color="fg.muted">
               {runtime?.message ?? "Idle"} {runtime?.durationMs ? `(${runtime.durationMs}ms)` : ""}
             </Text>
             {runtime?.error ? (
-              <Text fontSize="xs" color="red.300" maxW="240px" textAlign="right">
+              <Text fontSize="xs" color="fg.error" maxW="240px" textAlign="right">
                 {runtime.error}
               </Text>
             ) : null}
@@ -283,13 +283,13 @@ function App() {
   });
 
   return (
-    <Box bg="gray.950" minH="100vh" color="gray.100" p={{ base: "4", md: "6" }}>
+    <Box bg="bg" minH="100vh" color="fg" p={{ base: "4", md: "6" }}>
       <Stack gap="5" maxW="1200px" mx="auto">
         <Flex justify="space-between" align="center" gap="4">
           <Heading size="lg">Backup Runner</Heading>
           <HStack>
             {loadingTasks ? <Spinner size="sm" /> : null}
-            <Text fontSize="sm" color="gray.400">
+            <Text fontSize="sm" color="fg.muted">
               {selectedCount} selected
             </Text>
           </HStack>
@@ -300,14 +300,13 @@ function App() {
             <Field.Label>Task Config Path</Field.Label>
             <Input
               value={configPath}
-            onChange={(event) => setConfigPath(event.target.value)}
+              onChange={(event) => setConfigPath(event.target.value)}
               disabled={running || !apiReady}
-              bg="gray.900"
-              borderColor="gray.700"
             />
           </Field.Root>
           <Button
             variant="outline"
+            colorPalette="gray"
             onClick={async () => {
               if (!window.backupApi) {
                 return;
@@ -324,6 +323,7 @@ function App() {
           </Button>
           <Button
             variant="outline"
+            colorPalette="gray"
             onClick={() => void loadTaskList(configPath)}
             disabled={running || !apiReady}
           >
@@ -337,29 +337,36 @@ function App() {
               setSelected(allSelected ? [] : tasks.map((task) => task.backupName));
             }}
             variant="outline"
+            colorPalette="gray"
             disabled={running || tasks.length === 0 || !apiReady}
           >
             {allSelected ? "Clear Selection" : "Select All"}
           </Button>
           <Button
-            colorPalette="green"
+            variant="solid"
+            colorPalette="blue"
             onClick={() => void onRunClicked()}
             disabled={running || selected.length === 0 || !apiReady}
           >
             Run Selected
           </Button>
-          <Button colorPalette="red" variant="outline" onClick={() => void onCancelClicked()} disabled={!running}>
+          <Button
+            colorPalette="red"
+            variant="outline"
+            onClick={() => void onCancelClicked()}
+            disabled={!running}
+          >
             Cancel Run
           </Button>
         </Flex>
 
         {runError ? (
-          <Box p="3" rounded="sm" borderWidth="1px" borderColor="red.500" bg="red.950">
-            <Text color="red.200">{runError}</Text>
+          <Box p="3" rounded="sm" borderWidth="1px" borderColor="border.error" bg="bg.error">
+            <Text color="fg.error">{runError}</Text>
           </Box>
         ) : null}
 
-        <Separator borderColor="gray.800" />
+        <Separator borderColor="border" />
 
         <Stack gap="3">
           <Heading size="md">Tasks</Heading>
@@ -375,13 +382,13 @@ function App() {
       >
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content bg="gray.900" borderColor="gray.700">
+          <Dialog.Content bg="bg.subtle" borderColor="border.emphasized">
             <Dialog.Header>
               <Dialog.Title>ZIP Password</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="3">
-                <Text color="gray.300">At least one selected task requires ZIP encryption.</Text>
+                <Text color="fg.muted">At least one selected task requires ZIP encryption.</Text>
                 <Input
                   type="password"
                   value={zipPassword}
@@ -392,6 +399,7 @@ function App() {
             <Dialog.Footer>
               <Button
                 variant="outline"
+                colorPalette="gray"
                 onClick={() => {
                   setShowPasswordPrompt(false);
                   setPendingRun(false);
@@ -400,7 +408,8 @@ function App() {
                 Cancel
               </Button>
               <Button
-                colorPalette="green"
+                variant="solid"
+                colorPalette="blue"
                 onClick={async () => {
                   setShowPasswordPrompt(false);
                   if (pendingRun) {
