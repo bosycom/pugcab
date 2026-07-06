@@ -9,33 +9,34 @@ import type { RunProgressEvent, UiTask } from "./shared/contracts.js";
 let mainWindow: BrowserWindow | null = null;
 let currentRunController: AbortController | null = null;
 
-// VMs and remote sessions often have unstable GPU acceleration support.
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch("disable-gpu");
-app.commandLine.appendSwitch("disable-gpu-compositing");
-if (process.platform === "linux") {
-  app.commandLine.appendSwitch("ozone-platform", "x11");
-  app.commandLine.appendSwitch("ozone-platform-hint", "x11");
-  const chromiumTmpDir = resolve(process.cwd(), ".tmp-chromium");
-  if (!existsSync(chromiumTmpDir)) {
-    mkdirSync(chromiumTmpDir, { recursive: true });
-  }
-  chmodSync(chromiumTmpDir, 0o700);
-  process.env.TMPDIR = chromiumTmpDir;
-  process.env.TMP = chromiumTmpDir;
-  process.env.TEMP = chromiumTmpDir;
-  try {
-    app.setPath("temp", chromiumTmpDir);
-  } catch {
-    // Ignore in case Electron rejects setPath before initialization on some versions.
-  }
+/**
+ * Electron/Chromium flags are not one-size-fits-all on Linux.
+ *
+ * This app originally used a "fragile VM" profile (software rendering, no sandbox,
+ * custom temp dirs) for headless CI and remote desktops. That profile breaks WSL2
+ * dev in two distinct ways:
+ *
+ * 1. `--no-zygote` + `--single-process` → main process exits with SIGTRAP on
+ *    Electron 43 under WSL before any window opens.
+ * 2. `--no-sandbox` + `--disable-dev-shm-usage` → renderer crashes while loading
+ *    the Vite dev server (`platform_shared_memory_region_posix.cc` errors in /tmp).
+ *
+ * WSLg already provides a working display stack (Wayland/X11), /dev/shm, and GPU
+ * passthrough, so the VM workarounds are skipped there. Non-WSL Linux keeps them
+ * for environments where hardware acceleration and sandboxing are unreliable.
+ */
+const isWsl =
+  process.platform === "linux" &&
+  (process.env.WSL_DISTRO_NAME !== undefined ||
+    process.env.WSL_INTEROP !== undefined);
 
+/** Keep Electron profile/cache under the repo instead of the user home dir. */
+function configureProjectLocalPaths() {
   const userDataDir = resolve(process.cwd(), ".electron-user-data");
   if (!existsSync(userDataDir)) {
     mkdirSync(userDataDir, { recursive: true });
   }
   app.setPath("userData", userDataDir);
-  app.commandLine.appendSwitch("user-data-dir", userDataDir);
 
   const cacheDir = resolve(process.cwd(), ".electron-cache");
   if (!existsSync(cacheDir)) {
@@ -47,20 +48,61 @@ if (process.platform === "linux") {
   } catch {
     // Not available on all Electron versions.
   }
-  rmSync(resolve(userDataDir, "GPUCache"), { recursive: true, force: true });
+}
 
-  app.commandLine.appendSwitch("no-sandbox");
-  app.commandLine.appendSwitch("disable-setuid-sandbox");
-  app.commandLine.appendSwitch("disable-dev-shm-usage");
-  app.commandLine.appendSwitch("no-zygote");
-  app.commandLine.appendSwitch("single-process");
-  app.commandLine.appendSwitch("in-process-gpu");
-  app.commandLine.appendSwitch("use-gl", "angle");
-  app.commandLine.appendSwitch("use-angle", "swiftshader");
-  app.commandLine.appendSwitch("ignore-gpu-blocklist");
-  app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
-  app.commandLine.appendSwitch("gpu-program-cache-size-kb", "0");
-  app.commandLine.appendSwitch("disk-cache-size", "1");
+if (isWsl) {
+  // WSLg: rely on default sandbox, shm, and GPU behavior; only relocate app data.
+  configureProjectLocalPaths();
+} else {
+  // Software rendering for VMs, containers, and remote sessions without stable GPU.
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch("disable-gpu");
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+
+  if (process.platform === "linux") {
+    // Force X11 and project-local temp paths; some CI runners have broken /tmp or /dev/shm.
+    app.commandLine.appendSwitch("ozone-platform", "x11");
+    app.commandLine.appendSwitch("ozone-platform-hint", "x11");
+    const chromiumTmpDir = resolve(process.cwd(), ".tmp-chromium");
+    if (!existsSync(chromiumTmpDir)) {
+      mkdirSync(chromiumTmpDir, { recursive: true });
+    }
+    chmodSync(chromiumTmpDir, 0o700);
+    process.env.TMPDIR = chromiumTmpDir;
+    process.env.TMP = chromiumTmpDir;
+    process.env.TEMP = chromiumTmpDir;
+    try {
+      app.setPath("temp", chromiumTmpDir);
+    } catch {
+      // Ignore in case Electron rejects setPath before initialization on some versions.
+    }
+
+    configureProjectLocalPaths();
+    app.commandLine.appendSwitch(
+      "user-data-dir",
+      resolve(process.cwd(), ".electron-user-data")
+    );
+    rmSync(resolve(process.cwd(), ".electron-user-data", "GPUCache"), {
+      recursive: true,
+      force: true,
+    });
+
+    // Sandbox/shm overrides: required on some CI images, fatal on WSL (see block comment above).
+    app.commandLine.appendSwitch("no-sandbox");
+    app.commandLine.appendSwitch("disable-setuid-sandbox");
+    app.commandLine.appendSwitch("disable-dev-shm-usage");
+    // Process model overrides: stabilize headless runs; trigger SIGTRAP on WSL.
+    app.commandLine.appendSwitch("no-zygote");
+    app.commandLine.appendSwitch("single-process");
+    // SwiftShader/ANGLE: software GL when no usable GPU driver is present.
+    app.commandLine.appendSwitch("in-process-gpu");
+    app.commandLine.appendSwitch("use-gl", "angle");
+    app.commandLine.appendSwitch("use-angle", "swiftshader");
+    app.commandLine.appendSwitch("ignore-gpu-blocklist");
+    app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
+    app.commandLine.appendSwitch("gpu-program-cache-size-kb", "0");
+    app.commandLine.appendSwitch("disk-cache-size", "1");
+  }
 }
 
 function getDefaultConfigPath() {
