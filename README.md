@@ -16,6 +16,7 @@ Electron desktop backup runner (React + TypeScript) with CLI compatibility.
 - npm 10+
 - Linux/Windows/macOS for dev
 - Windows for full MTP runtime behavior
+- On Linux/WSL/macOS, `npm run forge-make:win` needs the system `zip` command (`@electron-forge/maker-zip` uses it to build the distributable). Debian/Ubuntu/WSL: `sudo apt install zip`. `npm run forge-package:win` does not require it.
 
 ## Quick Start
 
@@ -81,6 +82,8 @@ Output folder:
 Important: **do not copy only `backup-app.exe`**. Copy/run the full folder, or use zip artifact.
 
 ### 4) Make Windows Distributable Artifact
+
+On Linux/WSL, install `zip` first: `sudo apt install zip`
 
 ```bash
 npm run forge-make:win
@@ -162,6 +165,9 @@ node dist/backup-script.bundle.cjs --config ./backup.tasks.js
 
 - **`ERR_FILE_NOT_FOUND` in renderer assets**  
   Rebuild with `npm run build`; renderer uses `./assets/...` paths for `file://`.
+
+- **`spawn zip EACCES` during `forge-make:win`**  
+  The system `zip` CLI is missing or not executable — this is not a permissions problem on `out/`. Install it (`sudo apt install zip` on Debian/Ubuntu/WSL), then re-run `npm run forge-make:win`. If you cannot install packages, use `npm run forge-package:win` and zip `out/backup-app-win32-x64/` manually.
 
 ## Guides
 
